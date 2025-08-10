@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Void Browser</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #121212;
+        color: #e0e0e0;
+        overflow-x: hidden; /* Prevent horizontal scroll when chat is off-screen */
+        display: flex;
+        justify-content: center;
+      }
+      .void-bg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(
+          ellipse at 50% 50%,
+          rgba(58, 16, 106, 0.3) 0%,
+          rgba(18, 18, 18, 0) 70%
+        );
+        z-index: -1;
+      }
+      .search-bar:focus-within {
+        box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.5),
+          0 0 30px rgba(168, 85, 247, 0.3);
+        border-color: rgba(168, 85, 247, 0.7);
+      }
+      .speed-dial-item:hover {
+        background-color: rgba(45, 45, 45, 0.9);
+        transform: translateY(-4px);
+        border-color: rgba(255, 255, 255, 0.15);
+      }
+      .chat-bubble-user {
+        background-color: #581c87; /* Purple-800 */
+        align-self: flex-end;
+      }
+      .chat-bubble-ai {
+        background-color: #374151; /* Gray-700 */
+        align-self: flex-start;
+      }
+      .video-container {
+        align-self: flex-start;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+      }
+      #searchResultsContainer {
+        background-color: #374151;
+        padding: 1rem;
+        border-radius: 0.75rem;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+        max-width: 100%;
+        overflow-x: auto;
+        text-align: left;
+      }
+      .gsc-control-cse,
+      .gsc-result {
+        background: none !important;
+        border: none !important;
+        color: #e0e0e0 !important;
+      }
+      .gsc-search-box {
+        display: none !important;
+      }
+      .gs-title,
+      .gs-snippet,
+      .gs-label {
+        color: #e0e0e0 !important;
+      }
+      .gs-result .gs-title a,
+      .gs-result .gs-title a:hover,
+      .gs-result .gs-title a:visited {
+        color: #a855f7 !important;
+      }
+      .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 28px;
+      }
+      .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: 0.4s;
+        border-radius: 28px;
+      }
+      .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 20px;
+        width: 20px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: 0.4s;
+        border-radius: 50%;
+      }
+      input:checked + .toggle-slider {
+        background-color: #8b5cf6;
+      }
+      input:checked + .toggle-slider:before {
+        transform: translateX(22px);
+      }
+
+      /* Full-screen overlay styles for Void AI chat */
+      #voidChatView,
+      #previewView {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 0;
+        height: 100%;
+        background-color: #181818;
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+        transition: width 0.3s ease-in-out;
+        overflow: hidden; /* Hide content when chat is not open */
+      }
+      #voidChatView.open,
+      #previewView.open {
+        width: 100%;
+        overflow: auto; /* Allow scrolling when open */
+      }
+
+      #mainContent.hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="void-bg"></div>
+
+    <!-- Main Content Area -->
+    <main id="mainContent" class="text-center w-full max-w-4xl px-4">
+      <div id="mainSearchPage">
+        <div class="mb-8 mt-20">
+          <h1 class="text-7xl font-bold text-white tracking-wider">
+            <span
+              class="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500"
+              >V</span
+            >oid
+          </h1>
+          <p class="text-gray-400 mt-2">Your gateway to the web.</p>
+        </div>
+        <div class="relative w-full max-w-2xl mx-auto mb-8">
+          <div
+            class="search-bar flex items-center w-full rounded-full p-2 shadow-lg bg-gray-800/80 backdrop-blur-md border border-gray-700"
+          >
+            <svg
+              class="w-6 h-6 text-gray-400 mx-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              ></path>
+            </svg>
+            <input
+              type="text"
+              id="searchInput"
+              class="w-full bg-transparent text-white placeholder-gray-500 focus:outline-none text-lg"
+              placeholder="Search the web..."
+              aria-label="Search the web"
+            />
+            <button
+              id="mainSearchButton"
+              class="bg-purple-600 hover:bg-purple-500 text-white font-semibold py-2 px-5 rounded-full transition-colors duration-300 mr-2"
+              aria-label="Perform a web search"
+            >
+              Go
+            </button>
+            <button
+              id="toggleChatButton"
+              class="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-full transition-colors"
+              aria-label="Toggle Void AI Chat"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+                ></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <!-- Search Results will be injected here -->
+        <div id="searchResultsContainer" class="search-results">
+          <!-- Search results will be displayed here -->
+        </div>
+        <div
+          class="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-8 gap-4 max-w-3xl mx-auto"
+        >
+          <a
+            href="https://gmail.com"
+            target="_blank"
+            class="speed-dial-item flex flex-col items-center justify-center p-4 rounded-lg aspect-square bg-gray-900/70 border border-gray-800"
+            ><img
+              src="https://placehold.co/40x40/db4437/FFFFFF?text=G"
+              class="w-10 h-10 rounded-full mb-2"
+              alt="Gmail"
+            /><span class="text-sm text-gray-300">Gmail</span></a
+          >
+          <a
+            href="https://youtube.com"
+            target="_blank"
+            class="speed-dial-item flex flex-col items-center justify-center p-4 rounded-lg aspect-square bg-gray-900/70 border border-gray-800"
+            ><img
+              src="https://placehold.co/40x40/ff0000/FFFFFF?text=Y"
+              class="w-10 h-10 rounded-lg mb-2"
+              alt="Youtube"
+            /><span class="text-sm text-gray-300">YouTube</span></a
+          >
+          <a
+            href="https://twitter.com"
+            target="_blank"
+            class="speed-dial-item flex flex-col items-center justify-center p-4 rounded-lg aspect-square bg-gray-900/70 border border-gray-800"
+            ><img
+              src="https://placehold.co/40x40/1da1f2/FFFFFF?text=T"
+              class="w-10 h-10 rounded-full mb-2"
+              alt="Twitter"
+            /><span class="text-sm text-gray-300">Twitter</span></a
+          >
+          <a
+            href="https://reddit.com"
+            target="_blank"
+            class="speed-dial-item flex flex-col items-center justify-center p-4 rounded-lg aspect-square bg-gray-900/70 border border-gray-800"
+            ><img
+              src="https://placehold.co/40x40/ff4500/FFFFFF?text=R"
+              class="w-10 h-10 rounded-full mb-2"
+              alt="Reddit"
+            /><span class="text-sm text-gray-300">Reddit</span></a
+          >
+          <a
+            href="https://drive.google.com"
+            target="_blank"
+            class="speed-dial-item flex flex-col items-center justify-center p-4 rounded-lg aspect-square bg-gray-900/70 border border-gray-800"
+            ><img
+              src="https://placehold.co/40x40/4285f4/FFFFFF?text=D"
+              class="w-10 h-10 rounded-lg mb-2"
+              alt="Drive"
+            /><span class="text-sm text-gray-300">Drive</span></a
+          >
+          <a
+            href="https://netflix.com"
+            target="_blank"
+            class="speed-dial-item flex flex-col items-center justify-center p-4 rounded-lg aspect-square bg-gray-900/70 border border-gray-800"
+            ><img
+              src="https://placehold.co/40x40/e50914/FFFFFF?text=N"
+              class="w-10 h-10 rounded-lg mb-2"
+              alt="Netflix"
+            /><span class="text-sm text-gray-300">Netflix</span></a
+          >
+          <a
+            href="https://twitch.tv"
+            target="_blank"
+            class="speed-dial-item flex flex-col items-center justify-center p-4 rounded-lg aspect-square bg-gray-900/70 border border-gray-800"
+            ><img
+              src="https://placehold.co/40x40/9146ff/FFFFFF?text=Tw"
+              class="w-10 h-10 rounded-lg mb-2"
+              alt="Twitch"
+            /><span class="text-sm text-gray-300">Twitch</span></a
+          >
+          <a
+            href="#"
+            class="speed-dial-item flex flex-col items-center justify-center p-4 rounded-lg aspect-square text-gray-400 hover:text-white bg-gray-900/70 border border-gray-800"
+            ><svg
+              class="w-10 h-10 mb-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.5"
+                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+              ></path></svg
+            ><span class="text-sm">Add Site</span></a
+          >
+        </div>
+      </div>
+    </main>
+
+    <!-- Void AI Chat View -->
+    <div id="voidChatView">
+      <div
+        class="flex items-center justify-between p-4 bg-[#181818] border-b border-white/10"
+      >
+        <h2 class="text-2xl font-bold text-white flex items-center">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="mr-2"
+          >
+            <path
+              d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+            ></path>
+          </svg>
+          Void AI
+        </h2>
+        <div class="flex items-center ml-auto mr-4">
+          <label class="toggle-switch mr-2">
+            <input type="checkbox" id="smartSearchToggle" />
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="text-sm text-gray-400">Web Search</span>
+        </div>
+        <!-- Clear Chat Button -->
+        <button
+          id="clearChatHistoryButton"
+          class="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-full transition-colors mr-2"
+          aria-label="Clear chat history"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path
+              d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+            ></path>
+          </svg>
+        </button>
+        <button
+          id="closeChatButton"
+          class="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-full transition-colors"
+          aria-label="Close Void AI Chat"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div
+        id="chatContainer"
+        class="flex-grow overflow-y-auto p-4 space-y-4 bg-black/20"
+        role="log"
+        aria-live="polite"
+      >
+        <!-- Chat messages will be appended here -->
+      </div>
+      <div
+        class="p-4 bg-[#181818] border-t border-white/10 flex gap-2 items-center"
+      >
+        <input
+          type="text"
+          id="chatInput"
+          class="flex-grow bg-gray-700 text-white placeholder-gray-400 rounded-full px-6 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+          placeholder="Ask, or 'play video of...'"
+          aria-label="Chat with Void AI"
+        />
+        <button
+          id="chatSendButton"
+          class="bg-purple-600 hover:bg-purple-500 text-white font-semibold p-3 rounded-full transition-colors"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Website Preview View (New) -->
+    <div id="previewView">
+      <div class="flex items-center p-4 bg-[#181818] border-b border-white/10">
+        <h2 class="text-xl font-bold text-white flex-grow truncate">
+          Website Preview
+        </h2>
+        <button
+          id="closePreviewButton"
+          class="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-full transition-colors"
+          aria-label="Close website preview"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <iframe
+        id="previewIframe"
+        src=""
+        class="w-full h-full border-none"
+      ></iframe>
+    </div>
+
+    <script>
+      // --- API Keys ---
+      const API_KEY = "AIzaSyDDes-MN_TpGT4GtCNv1CSjOL0yK6ZBqu4";
+      const CSE_ID = "7782c3404bd2c4f21";
+
+      // --- DOM Elements ---
+      const searchInput = document.getElementById("searchInput");
+      const mainSearchButton = document.getElementById("mainSearchButton");
+      const chatContainer = document.getElementById("chatContainer");
+      const chatInput = document.getElementById("chatInput");
+      const chatSendButton = document.getElementById("chatSendButton");
+      const searchResultsContainer = document.getElementById(
+        "searchResultsContainer"
+      );
+      const smartSearchToggle = document.getElementById("smartSearchToggle");
+      const voidChatView = document.getElementById("voidChatView");
+      const mainContent = document.getElementById("mainContent");
+      const toggleChatButton = document.getElementById("toggleChatButton");
+      const closeChatButton = document.getElementById("closeChatButton");
+      const clearChatHistoryButton = document.getElementById(
+        "clearChatHistoryButton"
+      );
+      const previewView = document.getElementById("previewView");
+      const previewIframe = document.getElementById("previewIframe");
+      const closePreviewButton = document.getElementById("closePreviewButton");
+
+      // --- AI Knowledge Base ---
+      const knowledgeBase = {
+        hello: ["Hey there! 👋", "Hi! How's it going?", "Hello, friend! 😊"],
+        hi: [
+          "Hello! How can I assist you today?",
+          "Hey! What do you need?",
+          "Hi there!",
+        ],
+        bye: ["Goodbye! Talk to you soon.", "See you later!", "Farewell!"],
+        thanks: ["You're welcome!", "No problem!", "Glad I could help!"],
+        "what’s your name?": ["I’m Void AI, your friendly AI assistant."],
+        "who are you": [
+          "I'm Void AI, created to assist you. How can I help you today?",
+        ],
+        "how is your day": [
+          "Thanks for asking! My day’s been pretty good, just helping people out with all sorts of things. How about you? How’s your day been?",
+        ],
+        "who was the first president of the united states": [
+          "George Washington was the first President of the United States, serving from 1789 to 1997.",
+        ],
+        "what caused world war 1": [
+          "World War I was triggered by the assassination of Archduke Franz Ferdinand in 1914, but deeper causes included nationalism, militarism, and alliances.",
+        ],
+        "what caused world war 2": [
+          "World War II was caused by the Treaty of Versailles, the rise of dictators like Hitler, aggressive expansion by Germany, Italy, and Japan, and the invasion of Poland in 1939",
+        ],
+        "what was the cold war": [
+          "The Cold War was a political and military rivalry between the US and the Soviet Union from 1947 to 1991.",
+        ],
+        "what is gravity": [
+          "Gravity is the force that attracts objects with mass toward each other — most noticeably, objects fall toward Earth due to gravity.",
+        ],
+        "what is the speed of light": [
+          "The speed of light in a vacuum is approximately 299,792 kilometers per second (186,282 miles per second).",
+        ],
+        "who discovered penicillin": [
+          "Penicillin was discovered by Alexander Fleming in 1928.",
+        ],
+        "what is photosynthesis": [
+          "Photosynthesis is the process by which green plants use sunlight to make food from carbon dioxide and water.",
+        ],
+        "what is a black hole": [
+          "A black hole is a region in space where gravity is so strong that nothing, not even light, can escape from it.",
+        ],
+        "how many planets are in the solar system": [
+          "There are 8 planets in the solar system: Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, and Neptune.",
+        ],
+        "what is the sun made of": [
+          "The sun is made mostly of hydrogen and helium gases, and it's powered by nuclear fusion.",
+        ],
+        "what is artificial intelligence": [
+          "Artificial Intelligence (AI) is the simulation of human intelligence in machines that can perform tasks like learning, reasoning, and problem-solving.",
+        ],
+        "who invented the internet": [
+          "The internet was developed over time, but key figures include Vint Cerf and Bob Kahn, who created the TCP/IP protocols.",
+        ],
+        "what is a computer virus": [
+          "A computer virus is malicious software designed to spread to other devices and interfere with normal operations.",
+        ],
+        "who painted the mona lisa": [
+          "The Mona Lisa was painted by Leonardo da Vinci.",
+        ],
+        "what is the renaissance": [
+          "The Renaissance was a cultural movement from the 14th to the 17th century marked by a revival in art, science, and literature.",
+        ],
+        "what is protein": [
+          "Protein is a macronutrient that helps build and repair tissues in the body, found in foods like meat, eggs, and beans.",
+        ],
+        "is sugar bad for you": [
+          "Too much sugar can be harmful, increasing the risk of obesity, diabetes, and heart disease.",
+        ],
+        "what is anxiety": [
+          "Anxiety is a feeling of worry or fear that can be mild or intense, often related to stress or uncertainty.",
+        ],
+        "how to relax": [
+          "You can relax by breathing deeply, listening to music, meditating, or taking a walk.",
+        ],
+        "my head hurts": [
+          "I'm sorry to hear that! Headaches can be such a drag. Do you know what might be causing it? Could be stress, dehydration, screen time, or maybe something else. Let me know if you want some tips to ease it.",
+        ],
+        "i want to die": [
+          "I'm really sorry you're feeling this way. You're not alone — please talk to someone who can help, like a trusted adult or a mental health professional.",
+          "You matter, and your life is important. Please consider reaching out to a mental health professional or hotline in your area.",
+          "I'm not a human, but I care that you're safe. If you're in danger or feeling overwhelmed, please ask for help right away. You're not alone.",
+        ],
+        "i want to kill myself": [
+          "I'm really sorry you're going through this. You're not alone. Please talk to someone — like a friend, parent, teacher, or counselor — who can help.",
+          "You are not alone. Help is out there, and people want you to be okay. Please reach out to a mental health hotline or someone you trust.",
+          "You're important. Please consider calling a crisis line or talking to someone right now. You don’t have to deal with this by yourself.",
+        ],
+        "what is minecraft": [
+          "Minecraft is a sandbox video game where players can build, explore, and survive in a blocky, procedurally generated 3D world.",
+        ],
+        "what is roblox": [
+          "Roblox is an online platform where users can create and play games made by other users.",
+        ],
+        "what is fortnite": [
+          "Fortnite is a popular online battle royale game developed by Epic Games where players fight to be the last one standing.",
+        ],
+        "what is basketball": [
+          "Basketball is a team sport where players try to score points by throwing a ball through the opponent's hoop.",
+        ],
+        "who is lebron james": [
+          "LeBron James is a professional basketball player widely regarded as one of the greatest NBA players of all time.",
+        ],
+        "what is the world cup": [
+          "The FIFA World Cup is an international soccer tournament held every four years, featuring teams from all over the world.",
+        ],
+        "who is spider-man": [
+          "Spider-Man is a fictional superhero created by Marvel Comics. His real name is Peter Parker.",
+        ],
+        "what is marvel": [
+          "Marvel is a popular entertainment company known for creating superheroes like Iron Man, Captain America, and the Avengers.",
+        ],
+        "what is star wars": [
+          "Star Wars is a science fiction movie series created by George Lucas, featuring Jedi, the Force, and epic space battles.",
+        ],
+        "who is zeus": [
+          "Zeus is the king of the gods in Greek mythology and rules over the sky and thunder.",
+        ],
+        "what is valhalla": [
+          "Valhalla is the great hall where warriors go after death in Norse mythology.",
+        ],
+        "who is anubis": [
+          "Anubis is the ancient Egyptian god associated with mummification and the afterlife.",
+        ],
+        "what is tiktok": [
+          "TikTok is a social media platform where users can share and discover short-form videos.",
+        ],
+        "what is a meme": [
+          "A meme is a humorous image, video, or text that spreads rapidly online, often with variations.",
+        ],
+        "what is a hashtag": [
+          "A hashtag is a word or phrase preceded by a '#' used on social media to categorize and find posts.",
+        ],
+        "what is youtube": [
+          "YouTube is an American social media and online video sharing platform owned by Google.",
+        ],
+        "what is solo leveling": [
+          "(Solo Leveling) tells the story of Sung Jin-Woo, the weakest hunter in a world where powerful humans fight monsters from mysterious dungeons, but after surviving a deadly event, he gains a unique ability to grow stronger by leveling up, leading him on a journey from powerless to the most powerful hunter alive as he uncovers dark secrets about the dungeons and his own fate.",
+        ],
+      };
+
+      // --- Helper Functions ---
+      function addMessageToChat(message, sender, container) {
+        const bubble = document.createElement("div");
+        bubble.innerHTML = message;
+        bubble.className = `w-fit max-w-xs lg:max-w-sm p-3 rounded-xl break-words ${
+          sender === "user" ? "chat-bubble-user" : "chat-bubble-ai"
+        }`;
+        container.appendChild(bubble);
+        container.scrollTop = container.scrollHeight;
+        return bubble;
+      }
+
+      function addVideoToChat(query, container) {
+        const videoContainer = document.createElement("div");
+        videoContainer.className =
+          "video-container w-full rounded-lg overflow-hidden";
+        const iframe = document.createElement("iframe");
+        iframe.src = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(
+          query
+        )}`;
+        iframe.className = "w-full h-full border-none";
+        iframe.allow =
+          "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+        iframe.allowFullscreen = true;
+        videoContainer.appendChild(iframe);
+        container.appendChild(videoContainer);
+        container.scrollTop = container.scrollHeight;
+      }
+
+      async function performWebSearch(query, container) {
+        const loadingMessage = addMessageToChat(
+          `<span class="flex items-center">Searching the web for "${query}"<span class="ml-2 animate-pulse text-xl">. . .</span></span>`,
+          "ai",
+          container
+        );
+
+        const apiUrl = `https://www.googleapis.com/customsearch/v1?key=${API_KEY}&cx=${CSE_ID}&q=${encodeURIComponent(
+          query
+        )}`;
+
+        try {
+          const response = await fetch(apiUrl);
+          if (!response.ok) {
+            throw new Error(`API call failed with status: ${response.status}`);
+          }
+          const data = await response.json();
+
+          loadingMessage.remove();
+
+          if (data.items && data.items.length > 0) {
+            let resultsHtml = `<p class="font-bold mb-2">Web Search Results for "${query}"</p>`;
+            resultsHtml += `<div class="space-y-4">`;
+            data.items.forEach((item) => {
+              resultsHtml += `
+                            <div class="bg-gray-800 p-3 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between">
+                                <div class="flex-grow">
+                                    <a href="${item.link}" target="_blank" class="text-purple-400 hover:underline font-semibold text-base block mb-1">${item.title}</a>
+                                    <p class="text-xs text-gray-300">${item.snippet}</p>
+                                    <a href="${item.link}" target="_blank" class="text-xs text-blue-400 hover:underline mt-1 block truncate">${item.link}</a>
+                                </div>
+                                <button onclick="openPreview('${item.link}')" class="mt-2 sm:mt-0 ml-0 sm:ml-4 bg-purple-600 hover:bg-purple-500 text-white font-semibold py-2 px-4 rounded-full transition-colors duration-300 flex-shrink-0">
+                                    Preview
+                                </button>
+                            </div>
+                        `;
+            });
+            resultsHtml += `</div>`;
+            addMessageToChat(resultsHtml, "ai", container);
+          } else {
+            addMessageToChat(
+              `No results found for "${query}".`,
+              "ai",
+              container
+            );
+          }
+        } catch (error) {
+          loadingMessage.remove();
+          addMessageToChat(
+            "Sorry, an error occurred while performing the web search. Please check the API keys and your network connection.",
+            "ai",
+            container
+          );
+          console.error("Web Search Error:", error);
+        }
+      }
+
+      async function handleChat(inputEl, containerEl) {
+        const userInput = inputEl.value.trim();
+        const normalizedInput = userInput
+          .toLowerCase()
+          .replace(/[?.,!]/g, "")
+          .trim();
+        if (!userInput) return;
+
+        addMessageToChat(userInput, "user", containerEl);
+        inputEl.value = "";
+
+        if (smartSearchToggle && smartSearchToggle.checked) {
+          await performWebSearch(userInput, containerEl);
+        } else {
+          if (knowledgeBase[normalizedInput]) {
+            const responses = knowledgeBase[normalizedInput];
+            const randomIndex = Math.floor(Math.random() * responses.length);
+            addMessageToChat(responses[randomIndex], "ai", containerEl);
+          } else if (
+            normalizedInput.includes("video") ||
+            normalizedInput.includes("youtube")
+          ) {
+            const query = userInput
+              .replace(/play video of|show me a video of/i, "")
+              .trim();
+            addMessageToChat(
+              `Sure, here are some videos about "${query}":`,
+              "ai",
+              containerEl
+            );
+            addVideoToChat(query, containerEl);
+          } else {
+            addMessageToChat(
+              `I don't have that in my knowledge base.`,
+              "ai",
+              containerEl
+            );
+          }
+        }
+      }
+
+      // --- Event Listeners ---
+      mainSearchButton.addEventListener("click", () => {
+        const query = searchInput.value.trim();
+        if (query) {
+          // Clear old results before fetching new ones
+          searchResultsContainer.innerHTML = "";
+          performWebSearch(query, searchResultsContainer);
+        }
+      });
+
+      searchInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          const query = searchInput.value.trim();
+          if (query) {
+            searchResultsContainer.innerHTML = "";
+            performWebSearch(query, searchResultsContainer);
+          }
+        }
+      });
+
+      chatSendButton.addEventListener("click", () =>
+        handleChat(chatInput, chatContainer)
+      );
+      chatInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") handleChat(chatInput, chatContainer);
+      });
+
+      toggleChatButton.addEventListener("click", () => {
+        voidChatView.classList.add("open");
+        mainContent.classList.add("hidden");
+      });
+
+      closeChatButton.addEventListener("click", () => {
+        voidChatView.classList.remove("open");
+        mainContent.classList.remove("hidden");
+      });
+
+      clearChatHistoryButton.addEventListener("click", () => {
+        chatContainer.innerHTML = "";
+      });
+
+      closePreviewButton.addEventListener("click", () => {
+        previewView.classList.remove("open");
+      });
+
+      // --- New Preview Function ---
+      function openPreview(url) {
+        previewIframe.src = url;
+        previewView.classList.add("open");
+      }
+    </script>
+  </body>
+</html>
